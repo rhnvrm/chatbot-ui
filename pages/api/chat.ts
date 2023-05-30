@@ -8,6 +8,8 @@ import wasm from '../../node_modules/@dqbd/tiktoken/lite/tiktoken_bg.wasm?module
 
 import tiktokenModel from '@dqbd/tiktoken/encoders/cl100k_base.json';
 import { Tiktoken, init } from '@dqbd/tiktoken/lite/init';
+import { logOpenAIRequest } from "@/utils/app/logs";
+
 
 export const config = {
   runtime: 'edge',
@@ -17,13 +19,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     let body = await req.json();
     const { model, messages, key, prompt, temperature } = body as ChatBody;
-    if (LOG_INCOMING_MESSAGES === true) {
-      let chatBody = body as ChatBody;
-      if (LOG_TRIM_MESSAGES === true) {
-        chatBody.messages = chatBody.messages.slice(-1);
-      }
-      console.log('data', JSON.stringify(chatBody), 'user', req.headers.get('x-forwarded-user'));
-    }
+    logOpenAIRequest(body, req.headers.get('x-forwarded-user'))
 
     await init((imports) => WebAssembly.instantiate(wasm, imports));
     const encoding = new Tiktoken(
