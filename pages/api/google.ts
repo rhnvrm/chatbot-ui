@@ -3,12 +3,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { OPENAI_API_HOST } from '@/utils/app/const';
 import { cleanSourceText } from '@/utils/server/google';
 
-import { Message } from '@/types/chat';
+import { ChatBody, Message } from '@/types/chat';
 import { GoogleBody, GoogleSource } from '@/types/google';
 
 import { Readability } from '@mozilla/readability';
 import endent from 'endent';
 import jsdom, { JSDOM } from 'jsdom';
+import { logOpenAIRequest } from "@/utils/app/logs";
 
 const handler = async (req: NextApiRequest, res: NextApiResponse<any>) => {
   try {
@@ -111,6 +112,8 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<any>) => {
     `;
 
     const answerMessage: Message = { role: 'user', content: answerPrompt };
+    const prompt = `Use the sources to provide an accurate response. Respond in markdown format. Cite the sources you used as [1](link), etc, as you use them. Maximum 4 sentences.`
+    const temperature = 1
 
     const answerRes = await fetch(`${OPENAI_API_HOST}/v1/chat/completions`, {
       headers: {
@@ -126,18 +129,20 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<any>) => {
         messages: [
           {
             role: 'system',
-            content: `Use the sources to provide an accurate response. Respond in markdown format. Cite the sources you used as [1](link), etc, as you use them. Maximum 4 sentences.`,
+            content: prompt,
           },
           answerMessage,
         ],
         max_tokens: 1000,
-        temperature: 1,
+        temperature: temperature,
         stream: false,
       }),
     });
 
     const { choices: choices2 } = await answerRes.json();
     const answer = choices2[0].message.content;
+    const body =  {model, messages, key, prompt, temperature} as ChatBody
+    logOpenAIRequest(body, answerRes.headers.get('x-forwarded-user'));
 
     res.status(200).json({ answer });
   } catch (error) {
